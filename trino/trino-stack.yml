@@ -1,0 +1,43 @@
+version: '3.8'
+services:
+  trino-coordinator:
+    image: trinodb/trino
+    hostname: trino-coordinator
+    ports:
+      - "8080:8080"
+    environment:
+      - TRINO_NODE_TYPE=coordinator
+      - TRINO_DISCOVERY_URI=http://trino-coordinator:8080
+    configs:
+      - source: coordinator_config
+        target: /etc/trino/config.properties
+    # volumes:
+    #   - ./coordinator_config:/etc/trino
+    deploy:
+      placement:
+        constraints:
+          - node.labels.node_type == master
+
+  trino-worker:
+    image: trinodb/trino
+    environment:
+      - TRINO_NODE_TYPE=worker
+      - TRINO_DISCOVERY_URI=http://trino-coordinator:8080
+    # volumes:
+    #   - ./worker_config:/etc/trino
+    configs:
+      - source: worker_config
+        target: /etc/trino/config.properties
+    depends_on:
+      - trino-coordinator
+    deploy:
+      replicas: 2 
+      placement:
+        constraints:
+          - node.labels.node_type == slave
+  
+configs:
+  coordinator_config:
+    file: ./coordinator_config.properties
+  worker_config:
+    file: ./worker_config.properties

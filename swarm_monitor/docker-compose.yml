@@ -1,0 +1,72 @@
+services:
+  prometheus:
+    image: prom/prometheus:v2.37.1
+    hostname: prometheus
+    configs:
+      - source: prometheus-config
+        target: /etc/prometheus/prometheus.yml
+    volumes:
+      - prometheus_data:/prometheus
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - "9099:9090"
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.console.libraries=/usr/share/prometheus/console_libraries"
+      - "--web.console.templates=/usr/share/prometheus/consoles"
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+
+  node-exporter:
+    image: prom/node-exporter:latest
+    # hostname: '{{.Node.Hostname}}' # Use the node's hostname for easier identification in Prometheus
+    command:
+      - '--path.rootfs=/host'
+      # - '--collector.textfile.directory=/host/var/lib/node_exporter/textfile_collector'
+    volumes:
+      - /:/host:ro,rslave # Bind mount the host's root filesystem
+      # - /var/lib/node_exporter/textfile_collector:/var/lib/node_exporter/textfile_collector # For textfile collector
+    deploy:
+      mode: global
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.45.0
+    # hostname: cadvisor
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    deploy:
+      mode: global
+
+  grafana:
+    image: grafana/grafana:latest
+    hostname: grafana
+    container_name: grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-storage:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+
+configs:
+  prometheus-config:
+    file: ./prometheus/prometheus.yml
+
+volumes:
+  prometheus_data:
+  grafana-storage:
