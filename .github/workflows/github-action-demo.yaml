@@ -1,11 +1,19 @@
-name: GitHub Actions Demo
-run-name: ${{ github.actor }} is testing out GitHub Actions 🚀
+name: Homelab Docker Swarm deployment
+run-name: ${{ github.actor }} is deploying Docker Swarm 🚀
 
 on: [push]
 jobs:
   Explore-GitHub-Actions:
     runs-on: self-hosted
     steps:
+      - name: Check out repository code
+        uses: actions/checkout@v5
+      - name: Display Docker Nodes
+        run: docker node ls
+      - name: Deploy swarm_monitor
+        run: |
+          cd ${{github.workspace}}/swarm_monitor
+          docker stack deploy -c docker-compose.yml grafana
     #   - run: echo "🎉 The job was automatically triggered by a ${{ github.event_name }} event."
     #   - run: echo "🐧 This job is now running on a ${{ runner.os }} server hosted by GitHub!"
     #   - run: echo "🔎 The name of your branch is ${{ github.ref }} and your repository is ${{ github.repository }}."
@@ -17,5 +25,3 @@ jobs:
     #     run: |
     #       ls ${{ github.workspace }}
     #   - run: echo "🍏 This job's status is ${{ job.status }}."
-        - name: Display Docker Nodes
-          run: docker node ls
