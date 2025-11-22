@@ -79,7 +79,7 @@ services:
           - node.role == manager
     networks:
       - grafana
-      
+
 configs:
   prometheus-config:
     file: ./prometheus/prometheus.yml
@@ -90,7 +90,7 @@ volumes:
   prometheus_data:
   grafana-storage:
 
-network:
+networks:
   grafana:
     driver: overlay
     attachable: true
