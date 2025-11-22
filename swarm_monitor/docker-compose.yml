@@ -20,6 +20,8 @@ services:
       placement:
         constraints:
           - node.role == manager
+    networks:
+      - grafana
   node-exporter:
     image: nginx
     configs:
@@ -27,6 +29,8 @@ services:
         target: /etc/nginx/nginx.conf
     deploy:
       mode: global
+    networks:
+      - grafana
 
   # node-exporter:
   #   image: prom/node-exporter:latest
@@ -54,7 +58,8 @@ services:
       - /dev/disk/:/dev/disk:ro
     deploy:
       mode: global
-
+    networks:
+      - grafana
   grafana:
     image: grafana/grafana:latest
     hostname: grafana
@@ -72,7 +77,9 @@ services:
       placement:
         constraints:
           - node.role == manager
-
+    networks:
+      - grafana
+      
 configs:
   prometheus-config:
     file: ./prometheus/prometheus.yml
@@ -82,3 +89,8 @@ configs:
 volumes:
   prometheus_data:
   grafana-storage:
+
+network:
+  grafana:
+    driver: overlay
+    attachable: true
