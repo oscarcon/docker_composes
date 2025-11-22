@@ -14,6 +14,7 @@ jobs:
         run: |
           cd ${{github.workspace}}/swarm_monitor
           docker stack rm grafana
+          sleep 3
           docker stack deploy -c docker-compose.yml grafana
     #   - run: echo "🎉 The job was automatically triggered by a ${{ github.event_name }} event."
     #   - run: echo "🐧 This job is now running on a ${{ runner.os }} server hosted by GitHub!"
