@@ -1,43 +1,168 @@
 version: '3.8'
 services:
+  postgres:
+    image: postgres
+    ports:
+      - "6432:5432"
+    environment:
+      - POSTGRES_DB=metastore_db
+      - POSTGRES_USER=hive
+      - POSTGRES_PASSWORD=password
+    volumes:
+      - pgdata:/var/lib/postgresql
+    networks:
+      - default
+    deploy:
+      placement:
+        constraints:
+          - node.role == manager
+  
+  hive-metastore:
+    # This is the Hive Metastore service
+    image: 'starburstdata/hive:3.1.2-e.18'
+    # This is the hive server hostname
+    hostname: hive-metastore
+    ports:
+      # Expose Metastore Thrift service on port 9083.
+      - '9083:9083'
+    # In case of service/container crash, the container will restart.
+    restart: always
+    environment:
+      # JDBC driver for connecting Hive Metastore to Postgres
+      HIVE_METASTORE_DRIVER: org.postgresql.Driver
+
+      # JDBC URL for the Postgres DB. Ensure the hostname and port match your Postgres service.
+      HIVE_METASTORE_JDBC_URL: jdbc:postgresql://postgres:5432/metastore_db
+      
+      # Username for connecting to Postgres from Hive. Change this if you modified POSTGRES_USER.
+      HIVE_METASTORE_USER: hive
+      
+      # Password for connecting to Postgres from Hive. Change this if you modified POSTGRES_PASSWORD.
+      HIVE_METASTORE_PASSWORD: password
+      
+      # Location of the Hive warehouse where Delta Lake data is stored.
+      # You can modify this to match the bucket or path in your MinIO setup.
+      HIVE_METASTORE_WAREHOUSE_DIR: s3://trino/
+      
+      # MinIO endpoint. Replace this with your MinIO address and port.
+      S3_ENDPOINT: http://minio:9000
+      
+      # Access key for MinIO. Change this to your actual MinIO access key.
+      S3_ACCESS_KEY: admin
+      
+      # Secret key for MinIO. Change this to your actual MinIO secret key.
+      S3_SECRET_KEY: admin1234
+      
+      # Use path-style access. Keep this set to "true" for MinIO compatibility.
+      S3_PATH_STYLE_ACCESS: "true"
+      
+      # The region for S3 storage. For MinIO, leave this blank.
+      REGION: ""
+
+      # Following fields are placeholders for integration with other cloud services like Google Cloud and Azure.
+      # These can be left blank unless you're using one of those services.
+      GOOGLE_CLOUD_KEY_FILE_PATH: ""
+      AZURE_ADL_CLIENT_ID: ""
+      AZURE_ADL_CREDENTIAL: ""
+      AZURE_ADL_REFRESH_URL: ""
+      AZURE_ABFS_STORAGE_ACCOUNT: ""
+      AZURE_ABFS_ACCESS_KEY: ""
+      AZURE_WASB_STORAGE_ACCOUNT: ""
+      AZURE_ABFS_OAUTH: ""
+      AZURE_ABFS_OAUTH_TOKEN_PROVIDER: ""
+      AZURE_ABFS_OAUTH_CLIENT_ID: ""
+      AZURE_ABFS_OAUTH_SECRET: ""
+      AZURE_ABFS_OAUTH_ENDPOINT: ""
+      AZURE_WASB_ACCESS_KEY: ""
+
+      # Define Hive Metastore admin role. You can change the role if needed.
+      HIVE_METASTORE_USERS_IN_ADMIN_ROLE: "admin"
+    healthcheck:
+      # Health check to confirm if the Hive Metastore is running on port 9083.
+      test: bash -c "exec 6<> /dev/tcp/localhost/9083"   
+    depends_on:
+      - postgres
+    networks:
+      - default
+      - public
+    deploy:
+      placement:
+        constraints:
+          - node.role == manager
   trino-coordinator:
-    image: trinodb/trino
+    image: trinodb/trino:478
     hostname: trino-coordinator
     ports:
       - "8080:8080"
-    environment:
-      - TRINO_NODE_TYPE=coordinator
-      - TRINO_DISCOVERY_URI=http://trino-coordinator:8080
     configs:
+      - source: jvm_config
+        target: /etc/jvm.config
       - source: coordinator_config
         target: /etc/trino/config.properties
+      # - source: catalog_config
+      #   target: /etc/trino/catalog/hive.properties
+      - source: log_config
+        target: /etc/trino/log.properties
     # volumes:
     #   - ./coordinator_config:/etc/trino
+    depends_on:
+      - hive-metastore
+    networks:
+      - default 
+      - public
     deploy:
+      resources:
+        limits:
+          memory: 12288M
       placement:
         constraints:
-          - node.labels.node_type == master
+          - node.role == manager
 
   trino-worker:
-    image: trinodb/trino
-    environment:
-      - TRINO_NODE_TYPE=worker
-      - TRINO_DISCOVERY_URI=http://trino-coordinator:8080
+    image: trinodb/trino:478
     # volumes:
-    #   - ./worker_config:/etc/trino
+    #   - ./spill:/opt/trino/splill
     configs:
+      - source: jvm_config
+        target: /etc/jvm.config
       - source: worker_config
         target: /etc/trino/config.properties
+      # - source: catalog_config
+      #   target: /etc/trino/catalog/hive.properties
+      - source: log_config
+        target: /etc/trino/log.properties
     depends_on:
       - trino-coordinator
+    networks:
+      - default
+      - public
     deploy:
-      replicas: 2 
+      mode: replicated
+      resources:
+        limits:
+          memory: 12288M
+      replicas: 1
       placement:
         constraints:
-          - node.labels.node_type == slave
-  
+          - node.role == worker
+
 configs:
+  jvm_config:
+    file: ./etc/jvm.config
   coordinator_config:
-    file: ./coordinator_config.properties
+    file: ./etc/trino/coordinator_config.properties
   worker_config:
-    file: ./worker_config.properties
+    file: ./etc/trino/worker_config.properties
+  catalog_config:
+    file: ./etc/trino/catalog/hive.properties
+  log_config:
+    file: ./etc/trino/log.properties
+volumes:
+  pgdata: 
+
+networks:
+  default:
+    driver: overlay
+  public:
+    driver: overlay
+    external: true

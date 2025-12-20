@@ -1,0 +1,9 @@
+FROM apache/hive:4.0.0
+
+# ENV SERVICE_NAME=metastore
+# ENV DB_DRIVER=postgres
+# ENV SERVICE_OPTS="-Djavax.jdo.option.ConnectionDriverName=org.postgresql.Driver -Djavax.jdo.option.ConnectionURL=jdbc:postgresql://postgres:5432/metastore_db -Djavax.jdo.option.ConnectionUserName=hive -Djavax.jdo.option.ConnectionPassword=password"
+    
+COPY ./postgresql-42.5.1.jar /opt/hive/lib/postgres.jar
+RUN echo "Java CLASSPATH:"
+RUN echo $CLASSPATH

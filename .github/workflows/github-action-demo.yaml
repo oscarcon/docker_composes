@@ -1,7 +1,10 @@
 name: Homelab Docker Swarm deployment
 run-name: ${{ github.actor }} is deploying Docker Swarm 🚀
 
-on: [push]
+on: 
+  push:
+    paths:
+      - 'swarm_monitor/**'
 jobs:
   Explore-GitHub-Actions:
     runs-on: self-hosted
